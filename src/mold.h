@@ -310,6 +310,12 @@ public:
   bool icf_eligible = false;
   bool icf_leaf = false;
 
+  // For stats recovering
+  struct {
+    Atomic<i64> relocation_remains_supremum = -1;
+    Atomic<i64> relocation_remains_infimum = -1;
+  } stats;
+
   [[no_unique_address]] InputSectionExtras<E> extra;
 
 private:
@@ -328,6 +334,39 @@ private:
 
   std::optional<u64> get_tombstone(Symbol<E> &sym, SectionFragment<E> *frag);
 };
+
+struct RelocationsStats {
+  i64 min_dist_to_lower_bound {std::numeric_limits<i64>::max()};
+  i64 min_dist_to_upper_bound {std::numeric_limits<i64>::max()};
+  i64 min_dist_to_lower_bound_rel_idx {-1};
+  i64 min_dist_to_upper_bound_rel_idx {-1};
+};
+
+inline void update_relocation_stats(RelocationsStats &stats, i64 i, i64 val, i64 lo, i64 hi) {
+  auto to_lo = std::abs(lo - val);
+  auto to_hi = std::abs(hi - val);
+  if (to_lo < stats.min_dist_to_lower_bound) {
+    stats.min_dist_to_lower_bound = to_lo;
+    stats.min_dist_to_lower_bound_rel_idx = i;
+  }
+  if (to_hi < stats.min_dist_to_upper_bound) {
+    stats.min_dist_to_upper_bound = to_hi;
+    stats.min_dist_to_upper_bound_rel_idx = i;
+  }
+}
+
+template<typename E>
+inline void save_relocation_stats(Context<E> &ctx, InputSection<E> *isec, RelocationsStats &stats) {
+  if (stats.min_dist_to_lower_bound < ctx.stats.relocation_remains_infimum) {
+    ctx.stats.relocation_remains_infimum = stats.min_dist_to_lower_bound;
+    isec->stats.relocation_remains_infimum = stats.min_dist_to_lower_bound;
+  }
+  if (stats.min_dist_to_upper_bound < ctx.stats.relocation_remains_supremum) {
+    ctx.stats.relocation_remains_supremum = stats.min_dist_to_upper_bound;
+    isec->stats.relocation_remains_supremum = stats.min_dist_to_upper_bound;
+  }
+}
+
 
 //
 // tls.cc
@@ -2147,6 +2186,12 @@ struct Context {
   Symbol<E> *edata = nullptr;
   Symbol<E> *end = nullptr;
   Symbol<E> *etext = nullptr;
+
+  // Extra statistic for "free space" observation of output binary
+  struct {
+    Atomic<i64> relocation_remains_infimum = std::numeric_limits<i64>::max();
+    Atomic<i64> relocation_remains_supremum = std::numeric_limits<i64>::max();
+  } stats;
 
   [[no_unique_address]] ContextExtras<E> extra;
 };

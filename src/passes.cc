@@ -3172,6 +3172,11 @@ void show_stats(Context<E> &ctx) {
         alloc += sec->get_rels(ctx).size();
       else
         nonalloc += sec->get_rels(ctx).size();
+
+      if (ctx.stats.relocation_remains_infimum == sec->stats.relocation_remains_infimum)
+        Out(ctx)<< "The section with closest to lower bound relocation: " << *sec;
+      if (ctx.stats.relocation_remains_supremum == sec->stats.relocation_remains_supremum)
+        Out(ctx)<< "The section with closest to upper bound relocation: " << *sec;
     }
 
     static Counter comdats("comdats");
@@ -3213,6 +3218,9 @@ void show_stats(Context<E> &ctx) {
         for (std::unique_ptr<Thunk<E>> &thunk : osec->thunks)
           thunk_bytes += thunk->size();
   }
+
+  static Counter alloc_dist_to_lower_limit("relocation_remains_infimum", ctx.stats.relocation_remains_infimum);
+  static Counter alloc_dist_to_upper_limit("relocation_remains_supremum", ctx.stats.relocation_remains_supremum);
 
   Counter::print();
 
